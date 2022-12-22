@@ -13,6 +13,7 @@
 #include <v8.h>
 #include <workerd/io/actor-cache.h>
 #include <workerd/io/actor-storage.h>
+#include <workerd/api/web-socket.h>
 
 namespace workerd::api {
 
@@ -711,6 +712,59 @@ kj::OneOf<jsg::Ref<DurableObjectId>, kj::StringPtr> DurableObjectState::getId() 
 jsg::Promise<jsg::Value> DurableObjectState::blockConcurrencyWhile(jsg::Lock& js,
     jsg::Function<jsg::Promise<jsg::Value>()> callback) {
   return IoContext::current().blockConcurrencyWhile(js, kj::mv(callback));
+}
+
+void DurableObjectState::acceptWebSocket(
+    jsg::Ref<WebSocket> ws,
+    jsg::Optional<kj::Array<kj::String>> tags) {
+  JSG_ASSERT(!ws->isAccepted(), Error,
+      "Cannot call `acceptWebSocket()` if the WebSocket was already accepted via `accept()`");
+  JSG_ASSERT(ws->LOCAL == WebSocket::Locality::LOCAL, Error,
+      "Outgoing WebSocket connections cannot be hibernated.");
+
+  // We need to get a HibernationManager to give the websocket to.
+  auto& a = KJ_REQUIRE_NONNULL(IoContext::current().getActor());
+  if (a.getHibernationManager() == nullptr) {
+    // TODO(now): Actually set the hibernation manager.
+  }
+  // HibernationManager's acceptWebSocket() will throw if the websocket is in an incompatible state.
+  // Note that not providing a tag is equivalent to providing an empty tag array.
+  // Any duplicate tags will be ignored.
+  kj::Array<kj::String> distinctTags = [&]() -> kj::Array<kj::String> {
+    KJ_IF_MAYBE(t, tags) {
+      kj::HashSet<kj::String> seen;
+      for (auto tag = t->begin(); tag < t->end(); tag++) {
+        // TODO(now): Need to make sure this error makes its way up to the worker script.
+        KJ_REQUIRE(tag->size() <= 256, "the maximum tag length is 256 characters!");
+        if (!seen.contains(*tag)) {
+          seen.insert(kj::mv(*tag));
+        }
+      }
+
+      // TODO(now): Need to make sure this error makes its way up to the worker script.
+      KJ_REQUIRE(seen.size() <= 10, "a Hibernatable WebSocket cannot have more than 10 tags");
+      size_t position = 0;
+      auto distinct = kj::heapArray<kj::String>(seen.size());
+
+      for (auto tag = seen.begin(); tag < seen.end(); tag++, position++) {
+        distinct[position] = kj::mv(*tag);
+      }
+      return kj::mv(distinct);
+    }
+    return kj::Array<kj::String>();
+  }();
+  KJ_REQUIRE_NONNULL(a.getHibernationManager()).acceptWebSocket(kj::mv(ws), distinctTags);
+}
+
+kj::Array<jsg::Ref<api::WebSocket>> DurableObjectState::getWebSockets(
+    jsg::Lock& js,
+    jsg::Optional<kj::String> tag) {
+  auto& a = KJ_REQUIRE_NONNULL(IoContext::current().getActor());
+  KJ_IF_MAYBE(manager, a.getHibernationManager()) {
+    return manager->getWebSockets(
+        js, tag.map([](kj::StringPtr t) { return t; })).releaseAsArray();
+  }
+  return kj::Array<jsg::Ref<api::WebSocket>>();
 }
 
 kj::Array<kj::byte> serializeV8Value(v8::Local<v8::Value> value, v8::Isolate* isolate) {

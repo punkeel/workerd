@@ -34,6 +34,7 @@ namespace api {
   class ServiceWorkerGlobalScope;
   struct ExportedHandler;
   struct CryptoAlgorithm;
+  class WebSocket;
 }
 
 class IoContext;
@@ -661,10 +662,23 @@ public:
     virtual kj::Own<Loopback> addRef() = 0;
   };
 
+  class HibernationManager : public kj::Refcounted {
+    // The HibernationManager class manages HibernatableWebSockets created by an actor.
+    // The manager handles accepting new websockets, retreiving existing websockets by tag, and
+    // removing websockets from its collection when they disconnect.
+  public:
+    virtual void acceptWebSocket(jsg::Ref<api::WebSocket> ws, kj::ArrayPtr<kj::String> tags) = 0;
+    virtual kj::Vector<jsg::Ref<api::WebSocket>> getWebSockets(
+        jsg::Lock& js,
+        kj::Maybe<kj::StringPtr> tag) = 0;
+    virtual void hibernateWebSockets(jsg::Lock& js, v8::Isolate* isolate, IoContext& context) = 0;
+  };
+
   Actor(const Worker& worker, kj::Maybe<RequestTracker&> tracker, Id actorId,
         bool hasTransient, MakeActorCacheFunc makeActorCache,
         kj::Maybe<kj::StringPtr> className, MakeStorageFunc makeStorage, Worker::Lock& lock,
-        kj::Own<Loopback> loopback, TimerChannel& timerChannel, kj::Own<ActorObserver> metrics);
+        kj::Own<Loopback> loopback, TimerChannel& timerChannel, kj::Own<ActorObserver> metrics,
+        kj::Maybe<uint16_t> hibernationEventType);
   // Create a new Actor hosted by this Worker. Note that this Actor object may only be manipulated
   // from the thread that created it.
 
@@ -727,6 +741,18 @@ public:
   //   rather than have WorkerEntrypoint create it on the first request? We'd have to plumb through
   //   some more information to the place where `Actor` is created, which might be uglier than it's
   //   worth.
+
+  kj::Maybe<HibernationManager&> getHibernationManager();
+  // Get the HibernationManager which should be used for all activity in this Actor. Returns null if
+  // setHibernationManager() hasn't been called yet, or if the HibernationManager has moved to the
+  // DeferredProxy::proxyTask.
+
+  void setHibernationManager(kj::Own<HibernationManager> manager);
+  // Set the HibernationManager for this actor. This is called once, on the first call to
+  // `acceptWebSocket`.
+
+  kj::Maybe<uint16_t> getHibernationEventType();
+  // Only needs to be called when allocating a HibernationManager!
 
   const Worker& getWorker() { return *worker; }
 

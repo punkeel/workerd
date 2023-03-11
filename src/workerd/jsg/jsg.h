@@ -2105,6 +2105,3 @@ inline v8::Local<v8::Data> Data::getHandle(jsg::Lock& js) {
 #include "resource.h"
 #include "dom-exception.h"
 #include "struct.h"
-#include "promise.h"
-#include "function.h"
-#include "iterator.h"

@@ -4,6 +4,8 @@
 
 #include "writable.h"
 #include "readable.h"
+#include "internal.h"
+#include <workerd/jsg/value.h>
 
 namespace workerd::api {
 

@@ -3,8 +3,8 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 #include "transform.h"
+#include "internal.h"
 #include <workerd/jsg/function.h>
-#include <cmath>
 
 namespace workerd::api {
 

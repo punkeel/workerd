@@ -8,7 +8,6 @@
 // Any files declaring an API to export to JavaScript will need to include this header.
 
 #include <kj/string.h>
-#include <kj/function.h>
 #include <kj/exception.h>
 #include <kj/one-of.h>
 #include <type_traits>
@@ -2101,7 +2100,5 @@ inline v8::Local<v8::Data> Data::getHandle(jsg::Lock& js) {
 
 }  // namespace workerd::jsg
 
-// These two includes are needed for the JSG type glue macros to work.
-//#include "resource.h"
-//#include "dom-exception.h"
+// Included here to avoid circular dependency
 #include "struct.h"

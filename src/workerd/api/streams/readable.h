@@ -4,9 +4,10 @@
 
 #pragma once
 
-#include "internal.h"
 #include "standard.h"
-#include <kj/function.h>
+#include "writable.h"
+#include <workerd/jsg/iterator.h>
+namespace workerd { namespace api { class ReadableStreamInternalController; } }
 
 namespace workerd::api {
 

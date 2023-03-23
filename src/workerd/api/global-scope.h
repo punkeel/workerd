@@ -22,6 +22,7 @@
 #include "hibernatable-web-socket.h"
 #include "blob.h"
 #include "sockets.h"
+#include "streams.h"
 
 namespace workerd::api {
 

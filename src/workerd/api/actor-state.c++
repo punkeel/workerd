@@ -752,6 +752,10 @@ jsg::Promise<jsg::Value> DurableObjectState::blockConcurrencyWhile(jsg::Lock& js
   return IoContext::current().blockConcurrencyWhile(js, kj::mv(callback));
 }
 
+void setEventTimeout(int timeoutMs) {
+  // TODO(now): set this value in the appropriate place
+}
+
 kj::Array<kj::byte> serializeV8Value(v8::Local<v8::Value> value, v8::Isolate* isolate) {
   jsg::Serializer serializer(isolate, jsg::Serializer::Options {
     .version = 15,

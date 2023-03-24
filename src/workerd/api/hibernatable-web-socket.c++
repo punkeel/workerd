@@ -30,34 +30,45 @@ kj::Promise<WorkerInterface::CustomEvent::Result> HibernatableWebSocketCustomEve
   incomingRequest->delivered();
   EventOutcome outcome = EventOutcome::OK;
 
+  auto eventPromise = context.run(
+      [entrypointName=entrypointName, &context, params=kj::mv(params)]
+      (Worker::Lock& lock) mutable {
+    switch (params.type) {
+      case HibernatableSocketParams::Type::TEXT:
+        return lock.getGlobalScope().sendHibernatableWebSocketMessage(
+            kj::mv(params.message),
+            lock,
+            lock.getExportedHandler(entrypointName, context.getActor()));
+      case HibernatableSocketParams::Type::DATA:
+        return lock.getGlobalScope().sendHibernatableWebSocketMessage(
+            kj::mv(params.data),
+            lock,
+            lock.getExportedHandler(entrypointName, context.getActor()));
+      case HibernatableSocketParams::Type::CLOSE:
+        return lock.getGlobalScope().sendHibernatableWebSocketClose(
+            kj::mv(params.closeReason),
+            params.closeCode,
+            lock,
+            lock.getExportedHandler(entrypointName, context.getActor()));
+      case HibernatableSocketParams::Type::ERROR:
+        return lock.getGlobalScope().sendHibernatableWebSocketError(
+            lock,
+            lock.getExportedHandler(entrypointName, context.getActor()));
+      KJ_UNREACHABLE;
+    }
+  });
+
   try {
-    co_await context.run(
-        [entrypointName=entrypointName, &context, params=kj::mv(params)]
-        (Worker::Lock& lock) mutable {
-      switch (params.type) {
-        case HibernatableSocketParams::Type::TEXT:
-          return lock.getGlobalScope().sendHibernatableWebSocketMessage(
-              kj::mv(params.message),
-              lock,
-              lock.getExportedHandler(entrypointName, context.getActor()));
-        case HibernatableSocketParams::Type::DATA:
-          return lock.getGlobalScope().sendHibernatableWebSocketMessage(
-              kj::mv(params.data),
-              lock,
-              lock.getExportedHandler(entrypointName, context.getActor()));
-        case HibernatableSocketParams::Type::CLOSE:
-          return lock.getGlobalScope().sendHibernatableWebSocketClose(
-              kj::mv(params.closeReason),
-              params.closeCode,
-              lock,
-              lock.getExportedHandler(entrypointName, context.getActor()));
-        case HibernatableSocketParams::Type::ERROR:
-          return lock.getGlobalScope().sendHibernatableWebSocketError(
-              lock,
-              lock.getExportedHandler(entrypointName, context.getActor()));
-        KJ_UNREACHABLE;
-      }
-    });
+    KJ_IF_MAYBE(t, params.timeoutMs) {
+      // We want to set a timeout for the hibernatable web socket event. Whichever promise
+      // resolves last will be canceled. If our timeout resolves first, we want to set
+      // the outcome as canceled.
+      co_await context.afterLimitTimeout(*t * kj::MILLISECONDS).then([&outcome = outcome]() {
+        outcome = EventOutcome::CANCELED;
+      }).exclusiveJoin(kj::mv(eventPromise));
+    } else {
+      co_await eventPromise;
+    }
   } catch(kj::Exception e) {
     if (auto desc = e.getDescription();
         !jsg::isTunneledException(desc) && !jsg::isDoNotLogException(desc)) {

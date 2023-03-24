@@ -5,10 +5,12 @@
 #pragma once
 
 #include <kj/debug.h>
+#include <kj/time.h>
 
 #include <workerd/io/worker-interface.capnp.h>
 #include <workerd/api/global-scope.h>
 #include <workerd/io/worker-interface.h>
+
 
 namespace workerd::api {
 
@@ -40,6 +42,7 @@ struct HibernatableSocketParams {
   kj::String message;
   kj::String closeReason;
   int closeCode;
+  kj::Maybe<int> timeoutMs;
 };
 
 class HibernatableWebSocketCustomEventImpl final: public WorkerInterface::CustomEvent,

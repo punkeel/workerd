@@ -348,6 +348,8 @@ public:
   jsg::Promise<jsg::Value> blockConcurrencyWhile(jsg::Lock& js,
       jsg::Function<jsg::Promise<jsg::Value>()> callback);
 
+  void setEventTimeout(int timeoutMs);
+
   JSG_RESOURCE_TYPE(DurableObjectState) {
     JSG_METHOD(waitUntil);
     JSG_READONLY_INSTANCE_PROPERTY(id, getId);

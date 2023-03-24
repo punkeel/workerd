@@ -2013,4 +2013,10 @@ kj::Promise<void> IdentityTransformStreamImpl::writeHelper(kj::ArrayPtr<const kj
   KJ_UNREACHABLE;
 }
 
+kj::Own<ReadableStreamInternalController> newReadableStreamInternalController(
+    IoContext& ioContext,
+    kj::Own<ReadableStreamSource> source) {
+  return kj::heap<ReadableStreamInternalController>(ioContext.addObject(kj::mv(source)));
+}
+
 }  // namespace workerd::api

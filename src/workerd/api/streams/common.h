@@ -21,6 +21,7 @@ class ReadableStreamController;
 class ReadableStreamSource;
 class ReadableStreamDefaultController;
 class ReadableByteStreamController;
+class ReadableStreamSource;
 
 class WritableStream;
 class WritableStreamController;
@@ -423,6 +424,11 @@ public:
 
   virtual kj::Own<ReadableStreamController> detach(jsg::Lock& js) = 0;
 };
+
+kj::Own<ReadableStreamController> newReadableStreamJsController();
+kj::Own<ReadableStreamController> newReadableStreamInternalController(
+    IoContext& ioContext,
+    kj::Own<ReadableStreamSource> source);
 
 class WritableStreamController {
   // A WritableStreamController provides the underlying implementation for a WritableStream.

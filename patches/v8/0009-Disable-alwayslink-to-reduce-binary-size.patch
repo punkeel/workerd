@@ -1,0 +1,70 @@
+From 5243319bd4ee74d08b23d98a386281029cae7147 Mon Sep 17 00:00:00 2001
+From: Felix Hanau <felix@cloudflare.com>
+Date: Fri, 24 Mar 2023 20:48:45 -0400
+Subject: [PATCH] Disable alwayslink to reduce binary size
+
+---
+ bazel/BUILD.icu | 6 +++---
+ bazel/defs.bzl  | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/bazel/BUILD.icu b/bazel/BUILD.icu
+index 2ae79a5784f..4362857ae67 100644
+--- a/bazel/BUILD.icu
++++ b/bazel/BUILD.icu
+@@ -55,7 +55,7 @@ cc_library(
+         "source/i18n",
+     ],
+     tags = ["requires-rtti"],
+-    alwayslink = 1,
++    alwayslink = 0,
+ )
+ 
+ cc_library(
+@@ -84,7 +84,7 @@ cc_library(
+         "//conditions:default": [],
+     }),
+     deps = [":icuuc"],
+-    alwayslink = 1,
++    alwayslink = 0,
+ )
+ 
+ cc_library(
+@@ -121,5 +121,5 @@ cc_library(
+         ":icui18n",
+         ":icuuc",
+     ],
+-    alwayslink = 1,
++    alwayslink = 0,
+ )
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 8c3e3b9d1d9..08830fa3799 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -252,7 +252,7 @@ def v8_library(
+             includes = includes + default.includes,
+             copts = copts + default.copts,
+             linkopts = linkopts + default.linkopts,
+-            alwayslink = 1,
++            alwayslink = 0,
+             linkstatic = 1,
+             **kwargs
+         )
+@@ -271,7 +271,7 @@ def v8_library(
+             includes = includes + default.includes,
+             copts = copts + default.copts + ENABLE_I18N_SUPPORT_DEFINES,
+             linkopts = linkopts + default.linkopts,
+-            alwayslink = 1,
++            alwayslink = 0,
+             linkstatic = 1,
+             **kwargs
+         )
+@@ -291,7 +291,7 @@ def v8_library(
+             includes = includes + default.includes,
+             copts = copts + default.copts,
+             linkopts = linkopts + default.linkopts,
+-            alwayslink = 1,
++            alwayslink = 0,
+             linkstatic = 1,
+             **kwargs
+         )

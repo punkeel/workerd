@@ -265,6 +265,7 @@ git_repository(
         "//:patches/v8/0006-include-fix-for-compiling-v8-from-workerd.patch",
         "//:patches/v8/0007-Explicitly-include-ICUs-utf16.h.patch",
         "//:patches/v8/0008-Fix-v8-code_generator-imports.patch",
+        "//:patches/v8/0009-Disable-alwayslink-to-reduce-binary-size.patch",
     ],
 )
 

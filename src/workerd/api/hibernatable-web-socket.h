@@ -20,7 +20,9 @@ public:
 
   // TODO(soon): return correct ws instead of the current stub implementation
   jsg::Ref<WebSocket> getWebSocket(jsg::Lock& lock);
-  jsg::Value getError(jsg::Lock& lock);
+  jsg::Value convertError(jsg::Lock& lock, kj::Exception e) {
+    return lock.exceptionToJs(kj::mv(e));
+  }
 
   JSG_RESOURCE_TYPE(HibernatableWebSocketEvent) {
     JSG_INHERIT(ExtendableEvent);
@@ -28,18 +30,40 @@ public:
 };
 
 struct HibernatableSocketParams {
-  enum Type {
-    TEXT,
-    DATA,
-    CLOSE,
-    ERROR
+  // Event types and their corresponding parameters.
+
+  struct Text {
+    kj::String message;
   };
 
-  Type type;
-  kj::Array<byte> data;
-  kj::String message;
-  kj::String closeReason;
-  int closeCode;
+  struct Data {
+    kj::Array<byte> message;
+  };
+
+  struct Close {
+    kj::String closeReason;
+    int closeCode;
+    bool wasClean;
+  };
+
+  struct Error {
+    kj::Exception error;
+  };
+
+  kj::OneOf<Text, Data, Close, Error> eventType;
+
+  explicit HibernatableSocketParams(kj::String message): eventType(Text { kj::mv(message) }) {}
+  explicit HibernatableSocketParams(kj::Array<byte> message)
+      : eventType(Data { kj::mv(message) }) {}
+  explicit HibernatableSocketParams(kj::String closeReason, int closeCode, bool wasClean)
+      : eventType(Close { kj::mv(closeReason), closeCode, wasClean }) {}
+  explicit HibernatableSocketParams(kj::Exception e): eventType(Error { kj::mv(e) }) {}
+
+  HibernatableSocketParams(HibernatableSocketParams&& other) = default;
+
+  bool isCloseEvent() {
+    return eventType.is<Close>();
+  }
 };
 
 class HibernatableWebSocketCustomEventImpl final: public WorkerInterface::CustomEvent,

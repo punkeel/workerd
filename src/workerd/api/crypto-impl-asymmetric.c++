@@ -268,8 +268,9 @@ ImportAsymmetricResult importAsymmetric(kj::StringPtr format,
 
     auto [expectedUse, op0, op1] = [&, normalizedName] {
       if (normalizedName == "RSA-OAEP") {return std::make_tuple("enc", "encrypt", "wrapKey");}
-      if (normalizedName == "ECDH" ||
-          normalizedName == "X25519") {return std::make_tuple("enc", "unused", "unused");}
+      if (normalizedName == "ECDH" || normalizedName == "X25519") {
+        return std::make_tuple("enc", "unused", "unused");
+      }
       return std::make_tuple("sig", "sign", "verify");
     }();
 
@@ -1126,7 +1127,7 @@ public:
         "Missing field \"public\" in \"derivedKeyParams\".");
 
     JSG_REQUIRE(publicKey->getType() == "public"_kj, DOMInvalidAccessError, ""
-        "The public key provided has type \"", publicKey->getType(), "\", not \"public\"");
+        "The provided key has type \"", publicKey->getType(), "\", not \"public\"");
 
     JSG_REQUIRE(getAlgorithm().which() == publicKey->getAlgorithm().which(), DOMInvalidAccessError,
         "Base ", getAlgorithmName(), " private key cannot be used to derive a "
@@ -1826,7 +1827,7 @@ public:
         "Missing field \"public\" in \"derivedKeyParams\".");
 
     JSG_REQUIRE(publicKey->getType() == "public"_kj, DOMInvalidAccessError, ""
-        "The public key provided has type \"", publicKey->getType(), "\", not \"public\"");
+        "The provided key has type \"", publicKey->getType(), "\", not \"public\"");
 
     JSG_REQUIRE(getAlgorithm().which() == publicKey->getAlgorithm().which(), DOMInvalidAccessError,
         "Base ", getAlgorithmName(), " private key cannot be used to derive a "
@@ -1861,7 +1862,7 @@ public:
     for (kj::byte b : sharedSecret) {
       isNonZeroSecret |= b;
     }
-    JSG_REQUIRE(isNonZeroSecret == 0, DOMOperationError,
+    JSG_REQUIRE(isNonZeroSecret, DOMOperationError,
         "Detected small order secure curve points, aborting EDDH derivation");
     return sharedSecret.releaseAsArray();
   }

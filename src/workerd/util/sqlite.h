@@ -93,7 +93,7 @@ private:
       kj::Maybe<kj::StringPtr> dbName, kj::Maybe<kj::StringPtr> triggerName);
   // Implements SQLite authorizer callback, see sqlite3_set_authorizer().
 
-  void setupAuthorizer();
+  void setupSecurity();
 };
 
 class SqliteDatabase::Regulator {

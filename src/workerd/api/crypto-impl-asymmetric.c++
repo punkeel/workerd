@@ -50,7 +50,6 @@ public:
   // Add salt to digest context in order to generate or verify salted signature.
   // Currently only used for RSA-PSS sign and verify operations.
 
-
   // ---------------------------------------------------------------------------
   // Implementation of CryptoKey
 
@@ -1175,7 +1174,7 @@ public:
 
     auto outputBitLength = resultBitLength.orDefault(sharedSecret.size() * 8);
     JSG_REQUIRE(outputBitLength <= sharedSecret.size() * 8, DOMOperationError,
-        "Derived key length (", outputBitLength, " bits) is too long (should be less than ",
+        "Derived key length (", outputBitLength, " bits) is too long (should be at most ",
         sharedSecret.size() * 8, " bits).");
 
     // Round up since outputBitLength may not be a perfect multiple of 8.
@@ -1479,6 +1478,15 @@ kj::Own<EVP_PKEY> ellipticJwkReader(int curveId, SubtleCrypto::JsonWebKey keyDat
         "Missing field \"crv\" for ", curveName, " key.");
     JSG_REQUIRE(crv == curveName, DOMNotSupportedError,
         "Only ", curveName, " is supported but \"", crv, "\" was requested.");
+    KJ_IF_MAYBE(alg, keyDataJwk.alg) {
+      // If this JWK specifies an algorithm, make sure it jives with the hash we were passed via
+      // importKey().
+      if (curveId == NID_ED25519) {
+        JSG_REQUIRE(*alg == "EdDSA", DOMDataError,
+            "JSON Web Key Algorithm parameter \"alg\" (\"", *alg, "\") does not match requested "
+            "Ed25519 curve.");
+      }
+    }
 
     auto x = UNWRAP_JWK_BIGNUM(kj::mv(keyDataJwk.x), DOMDataError,
         "Invalid ", crv, " key in JSON WebKey; missing or invalid public key component (\"x\").");
@@ -1526,7 +1534,7 @@ kj::Own<EVP_PKEY> ellipticJwkReader(int curveId, SubtleCrypto::JsonWebKey keyDat
         "\" listed in JSON Web Key Algorithm parameter.");
 
     JSG_REQUIRE(iter->second == curveId, DOMDataError,
-        "JSON Web Key Algorithm parameter \"alg\" \"", *alg, "\" does not match requested EC curve.");
+        "JSON Web Key Algorithm parameter \"alg\" (\"", *alg, "\") does not match requested curve.");
   }
 
   auto ecKey = OSSLCALL_OWN(EC_KEY, EC_KEY_new_by_curve_name(curveId), DOMOperationError,
@@ -1728,7 +1736,6 @@ kj::Own<CryptoKey::Impl> CryptoKey::Impl::importEcdh(
 // =====================================================================================
 // EDDSA & EDDH
 
-
 namespace {
 
 // Abstract base class for EDDSA and EDDH. Unfortunately, the legacy NODE-ED25519 identifier has a
@@ -1837,6 +1844,11 @@ public:
         "Private key for derivation is using \"", getAlgorithmName(),
         "\" while public key is using \"", publicKey->getAlgorithmName(), "\".");
 
+    auto outputBitLength = resultBitLength.orDefault(X25519_SHARED_KEY_LEN * 8);
+    JSG_REQUIRE(outputBitLength <= X25519_SHARED_KEY_LEN * 8, DOMOperationError,
+        "Derived key length (", outputBitLength, " bits) is too long (should be at most ",
+        X25519_SHARED_KEY_LEN * 8, " bits).");
+
     // The check above for the algorithm `which` equality ensures that the impl can be downcast to
     // EdDsaKey (assuming we don't accidentally create a class that doesn't inherit this one that
     // for some reason returns an EdDsaKey).
@@ -1849,13 +1861,12 @@ public:
     JSG_REQUIRE(1 == EVP_PKEY_derive_set_peer(ctx, publicKeyImpl.getEvpPkey()),
         InternalDOMOperationError, "Failed to set EDDH peer", internalDescribeOpensslErrors());
 
-    kj::Vector<kj::byte> sharedSecret(X25519_SHARED_KEY_LEN);
-    size_t skeylen = 0;
-    JSG_REQUIRE(1 == EVP_PKEY_derive(ctx, NULL, &skeylen), DOMOperationError,
-        "Failed to derive EDDH key", internalDescribeOpensslErrors());
-    KJ_ASSERT(skeylen == X25519_SHARED_KEY_LEN);
+    kj::Vector<kj::byte> sharedSecret;
+    sharedSecret.resize(X25519_SHARED_KEY_LEN);
+    size_t skeylen = X25519_SHARED_KEY_LEN;
     JSG_REQUIRE(1 == EVP_PKEY_derive(ctx, sharedSecret.begin(), &skeylen), DOMOperationError,
         "Failed to derive EDDH key", internalDescribeOpensslErrors());
+    KJ_ASSERT(skeylen == X25519_SHARED_KEY_LEN);
 
     // Check for all-zero value as mandated by spec
     kj::byte isNonZeroSecret = 0;
@@ -1864,6 +1875,14 @@ public:
     }
     JSG_REQUIRE(isNonZeroSecret, DOMOperationError,
         "Detected small order secure curve points, aborting EDDH derivation");
+
+    // mask off bits like in ECDH's deriveBits()
+    auto resultByteLength = integerCeilDivision(outputBitLength, 8u);
+    sharedSecret.truncate(resultByteLength);
+    auto numBitsToMaskOff = resultByteLength * 8 - outputBitLength;
+    KJ_DASSERT(numBitsToMaskOff < 8, numBitsToMaskOff);
+    uint8_t mask = ~((1 << numBitsToMaskOff) - 1);
+    sharedSecret.back() &= mask;
     return sharedSecret.releaseAsArray();
   }
 
@@ -1884,6 +1903,9 @@ private:
     jwk.kty = kj::str("OKP");
     jwk.crv = kj::str(getAlgorithmName() == "X25519"_kj ? "X25519"_kj : "Ed25519"_kj);
     jwk.x = kj::encodeBase64Url(kj::arrayPtr(rawPublicKey, publicKeyLen));
+    if (getAlgorithmName() == "Ed25519"_kj) {
+      jwk.alg = kj::str("EdDSA");
+    }
 
     if (getType() == "private"_kj) {
       // Deliberately use ED25519_PUBLIC_KEY_LEN here.
@@ -1972,6 +1994,7 @@ kj::OneOf<jsg::Ref<CryptoKey>, CryptoKeyPair> EdDsaKeyBase::generateKey(
   uint8_t rawPublicKey[keylen];
   uint8_t rawPrivateKey[keylen * 2];
   keypair(rawPublicKey, rawPrivateKey);
+
   // The private key technically also contains the public key. Why does the keypair function bother
   // writing out the public key to a separate buffer?
 

@@ -783,14 +783,7 @@ private:
   void destroy();
 
   // Debugging helpers.
-  void assertInvariant() {
-#ifdef KJ_DEBUG
-    assertInvariantImpl();
-#endif
-  }
-#ifdef KJ_DEBUG
-  void assertInvariantImpl();
-#endif
+  void assertInvariant();
 };
 
 template <typename T>

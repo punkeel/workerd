@@ -86,4 +86,18 @@ inline kj::StringPtr maybeOmitColoFromSentry(uint32_t coloId) {
     }                                                                          \
   } while (0)
 
+// DFAIL_ASSERT_OR_LOG_ERROR* macros are meant for assertions that should not be fatal if failed but
+// we still want to see as sentry events and to break in tests. There is intentionally not a
+// non-FAIL version because KJ_ASSERT can convert certain conditions into an expression that the
+// sentry handler cannot understand. There is not a KJ_ASSERT_NONNULL version because that would
+// imply that we were able to deref a falsy value. REQUIRE is also not provided because that implies
+// that the caller was at fault, so we should tell them with an exception.
+#ifdef KJ_DEBUG
+#define DFAIL_ASSERT_OR_LOG_ERROR(...) KJ_FAIL_ASSERT(__VA_ARGS__)
+#define DFAIL_ASSERT_OR_LOG_ERROR_ONCE(...) KJ_FAIL_ASSERT(__VA_ARGS__)
+#else
+#define DFAIL_ASSERT_OR_LOG_ERROR(...) KJ_LOG(ERROR, __VA_ARGS__)
+#define DFAIL_ASSERT_OR_LOG_ERROR_ONCE(...) LOG_ERROR_ONCE(__VA_ARGS__)
+#endif
+
 } // namespace workerd

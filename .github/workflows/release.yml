@@ -126,7 +126,7 @@ jobs:
           path: /tmp
       # Set execute permissions before compressing the binary
       - if: matrix.arch != 'windows-64'
-        run: chmod +x /tmp/workerd${{ matrix.arch == 'windows-64' && '.exe' || '' }}
+        run: chmod +x /tmp/workerd
       - name: Compress release binary
         run: |
             # As of release v1.20230404.0 the Linux x64 binary after debug_strip is 65.8 MB,
